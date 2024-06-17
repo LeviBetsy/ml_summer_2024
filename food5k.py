@@ -1,3 +1,5 @@
+#dataset location wrongs
+
 import torch
 import os
 import torchvision
@@ -35,9 +37,9 @@ for param in vgg16_model.parameters():
 class Food5kDataset(torch.utils.data.Dataset):
   def __init__(self, split="train", transform=None):
     if (split == "train"):
-      self.img_dir = "food5k/training"
+      self.img_dir = "data/food5k/training"
     elif (split == "test"):
-      self.img_dir = "food5k/evaluation"
+      self.img_dir = "data/food5k/evaluation"
 
     #food and non food directory
     self.food_dir = os.path.join(self.img_dir, "food")
@@ -64,10 +66,10 @@ class Food5kDataset(torch.utils.data.Dataset):
       image = self.transform(image)
     return image, label
 
-dataset_ratio = 1
+dataset_ratio = 0.05
 transforms = AlexNet_Weights.IMAGENET1K_V1.transforms()
 # print(transforms) TODO: ask tuba about transform
-batch_size = 32
+batch_size = 4
 
 #TODO: ask tuba about validation
 
@@ -192,6 +194,12 @@ class ConcatFeatureNet(nn.Module):
         inputs = inputs.to(device)
         labels = labels.to(device)
 
+        print(inputs.shape)
+        print(labels.shape)
+        print(inputs)
+        print(labels)
+
+
         optimizer.zero_grad()
         outputs = self(inputs)
 
@@ -236,7 +244,7 @@ class ConcatFeatureNet(nn.Module):
 concat = ConcatFeatureNet([alexnetfc6, vgg16fc6], dummy_input).to(device)
 
 criterion = nn.CrossEntropyLoss()
-epoch_num = 10
+epoch_num = 1
 learning_rate = 0.001
 
 optimizer = optim.Adam(concat.parameters(), lr=learning_rate)
