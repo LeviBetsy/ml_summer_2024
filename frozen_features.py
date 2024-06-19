@@ -9,7 +9,7 @@ import torch.nn as nn
 import time
 import torchvision.transforms.v2 as v2
 
-dataset_ratio = 0.005
+dataset_ratio = 0.2
 
 device_name = "mps"
 device = torch.device(device_name)
@@ -123,7 +123,8 @@ trainset = torchvision.datasets.Food101(root='./data', split="train",
 trainset, _ = torch.utils.data.random_split(trainset, [dataset_ratio, 1 - dataset_ratio])
 trainloader = torch.utils.data.DataLoader(trainset, batch_size=1, shuffle=True)
 
-print(len(trainset))
+# print(len(trainset))
+
 
 
 testset = torchvision.datasets.Food101(root='./data', split="test",
@@ -135,7 +136,7 @@ def extract_frozen_features(out_file, dataloader):
   with torch.no_grad():
     # ft_set = torch.empty(0).to(device)
     ft_set = torch.empty(0)
-    for _, data in enumerate(dataloader):
+    for index, data in enumerate(dataloader):
       img, label = data
       img = img.to(device)
       label = label.to(device)
@@ -150,6 +151,9 @@ def extract_frozen_features(out_file, dataloader):
       # print(label_w_ft.shape)
       # ft_set = torch.cat((ft_set, label_w_ft.unsqueeze(0)), dim = 0).to(device)
       ft_set = torch.cat((ft_set, label_w_ft.unsqueeze(0).cpu()), dim = 0)
+
+      if index % 1000 == 0:
+        print(f"{index}th image")
 
     ft_set = ft_set.cpu().numpy()
     df = pandas.DataFrame(ft_set)
@@ -189,8 +193,7 @@ def data_set_from_csv(csv_file, batch_size):
     features_tensor = features_tensor.to(torch.float32)
     training_dataset.append((labels_tensor, features_tensor))
 
-    if index % 1000 == 0:
-      print(f"{index}th image")
+    
   return training_dataset, ft_concat_size
 
 
@@ -198,7 +201,7 @@ if __name__ == "__main__":
   start_time = time.time()
   # extract_frozen_features("food5ktest.csv", testloader)
   # extract_frozen_features("food5ktrain.csv", trainloader)
-  extract_frozen_features("food101ktrain_aug.csv", trainloader)
+  extract_frozen_features("food101k_10000images.csv", trainloader)
   print("finished")
   end_time = time.time()
   elapsed_time = end_time - start_time
