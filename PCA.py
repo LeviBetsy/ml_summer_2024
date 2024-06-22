@@ -25,11 +25,12 @@ print(f"batch size: {batch_size}")
 
 # testset, _ = frozen_features.data_set_from_csv("food5ktest.csv", batch_size)
 
-trainset, ft_concat_size = frozen_features.data_set_from_csv("food101ktrain.csv", batch_size)
 # trainset, ft_concat_size = frozen_features.data_set_from_csv("food101ktrain.csv", batch_size)
+trainset, ft_concat_size = frozen_features.data_set_from_csv("doublef101_aug.csv", batch_size)
+
 print(f"Number of batches: {len(trainset)}")
 
-testset, _ = frozen_features.data_set_from_csv("food101ktest.csv", batch_size)
+testset, _ = frozen_features.data_set_from_csv("doublef101_test.csv", batch_size)
 
 end_time = time.time()
 elapsed_time = end_time - start_time
@@ -144,7 +145,7 @@ def assess_accuracy(model, testloader):
 if __name__ == "__main__":
   classifier = Food101kClassifier().to(device)
   criterion = nn.CrossEntropyLoss()
-  epoch_num = 20
+  epoch_num = 50
   learning_rate = 0.001
   optimizer = optim.Adam(classifier.parameters(), lr=learning_rate)
   train_model(classifier, trainset, epoch_num, criterion, optimizer)

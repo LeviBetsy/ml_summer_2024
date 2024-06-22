@@ -39,6 +39,20 @@ class VGG16Fc6(nn.Module):
     x = self.fc6(x)
     return x
 
+device_name = "mps"
+device = torch.device(device_name)
+
+alexnetfc6 = AlexNetFc6().to(device)
+alexnetfc6.eval()
+for param in alexnetfc6.parameters():
+  param.requires_grad = False
+
+vgg16fc6 = VGG16Fc6().to(device)
+vgg16fc6.eval()
+for param in vgg16fc6.parameters():
+  param.requires_grad = False
+
+    
 def alexfc6_vgg16fc6():
   device_name = "mps"
   device = torch.device(device_name)
