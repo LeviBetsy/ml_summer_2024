@@ -18,17 +18,10 @@ device = torch.device(device_name)
 start_time = time.time()
 
 batch_size = 32
-print(f"batch size: {batch_size}")
+print(f"Batch size: {batch_size}")
 
-# trainset, ft_concat_size = frozen_features.data_set_from_csv("food5ktrain.csv", batch_size)
-# print(f"Number of batches: {len(trainset)}")
-
-# testset, _ = frozen_features.data_set_from_csv("food5ktest.csv", batch_size)
-
-# trainset, ft_concat_size = frozen_features.data_set_from_csv("food101ktrain.csv", batch_size)
 trainset, ft_concat_size = frozen_features.data_set_from_csv("doublef101_aug.csv", batch_size)
 
-print(f"Number of batches: {len(trainset)}")
 
 testset, _ = frozen_features.data_set_from_csv("doublef101_test.csv", batch_size)
 
@@ -62,30 +55,24 @@ elapsed_time = end_time - start_time
 print(f"Elapsed time for PCA construction: {int(elapsed_time)} seconds")
 
 
-
-
-
 #                           NN
 
 
-class Food101kClassifier(nn.Module):
+class Food101kPCAClassifier(nn.Module):
   def __init__(self): #hp stands for hyperparameters
     super().__init__()
     self.layers = nn.Sequential(
       # nn.ReLU(),
+
       nn.Linear(number_of_components, 500),
-      # nn.Linear(1, 500),
       nn.BatchNorm1d(500),
       nn.ReLU(),
+
       nn.Linear(500, 256),
-      
       nn.BatchNorm1d(256),
       nn.ReLU(),
-      nn.Linear(256, 101),
-      # nn.BatchNorm1d(256),
-      # nn.ReLU(),
-      # nn.Linear(256, 101),
 
+      nn.Linear(256, 101),
       nn.Softmax(dim = 1) #apply soft max to the second dimension, ignoring batch
     )
     print(f"Classifier layers: {self.layers}")
@@ -143,7 +130,7 @@ def assess_accuracy(model, testloader):
 
 #                                                       TRAINING THE NN
 if __name__ == "__main__":
-  classifier = Food101kClassifier().to(device)
+  classifier = Food101kPCAClassifier().to(device)
   criterion = nn.CrossEntropyLoss()
   epoch_num = 50
   learning_rate = 0.001

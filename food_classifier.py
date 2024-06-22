@@ -14,18 +14,6 @@ import frozen_features
 device_name = "mps"
 device = torch.device(device_name)
 
-batch_size = 32
-print(f"batch size: {batch_size}")
-
-# trainset, ft_concat_size = frozen_features.data_set_from_csv("food5ktrain.csv", batch_size)
-# print(f"Number of batches: {len(trainset)}")
-
-# testset, _ = frozen_features.data_set_from_csv("food5ktest.csv", batch_size)
-
-trainset, ft_concat_size = frozen_features.data_set_from_csv("food101ktrain.csv", batch_size)
-print(f"Number of batches: {len(trainset)}")
-
-testset, _ = frozen_features.data_set_from_csv("food101ktest.csv", batch_size)
 
 #                                         NN
 class Food5kClassifier(nn.Module):
@@ -52,20 +40,18 @@ class Food101kClassifier(nn.Module):
     super().__init__()
     self.layers = nn.Sequential(
       nn.ReLU(),
-      nn.Linear(ft_concat_size, 1000),
+      nn.Linear(ft_concat_size, 4000),
+      nn.BatchNorm1d(4000),
+      nn.ReLU(),
+
+      nn.Linear(4000, 1000),
       nn.BatchNorm1d(1000),
       nn.ReLU(),
-      nn.Linear(1000, 101),
-      
-      # nn.BatchNorm1d(500),
-      # nn.ReLU(),
-      # nn.Linear(500, 256),
-      # nn.BatchNorm1d(256),
-      # nn.ReLU(),
-      # nn.Linear(256, 101),
 
+      nn.Linear(1000, 101),
       nn.Softmax(dim = 1) #apply soft max to the second dimension, ignoring batch
-  )
+    )
+    print(f"Classifier layers: {self.layers}")
 
   def forward(self, x):
     x = self.layers(x)
@@ -101,7 +87,6 @@ def assess_accuracy(model, testloader):
     for data in testset:
       labels, images  = data
       labels = labels.to(device)
-      # print(labels.shape)
       actual_labels = torch.cat((actual_labels, labels), dim = 0)
 
       images = images.to(device)
@@ -114,9 +99,23 @@ def assess_accuracy(model, testloader):
 
 #                                                       TRAINING THE NN
 if __name__ == "__main__":
+  start_time = time.time()
+
+  batch_size = 32
+  print(f"Batch size: {batch_size}")
+
+  trainset, ft_concat_size = frozen_features.data_set_from_csv("doublef101_aug.csv", batch_size)
+
+  testset, _ = frozen_features.data_set_from_csv("doublef101_test.csv", batch_size)
+
+  end_time = time.time()
+  elapsed_time = end_time - start_time
+
+  print(f"Elapsed time for csv dataset reading: {int(elapsed_time)} seconds")
+
   classifier = Food101kClassifier().to(device)
   criterion = nn.CrossEntropyLoss()
-  epoch_num = 20
+  epoch_num = 50
   learning_rate = 0.001
   optimizer = optim.Adam(classifier.parameters(), lr=learning_rate)
   train_model(classifier, trainset, epoch_num, criterion, optimizer)

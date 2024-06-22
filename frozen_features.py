@@ -12,38 +12,10 @@ from torchvision.io import read_image
 
 import matplotlib.pyplot as plt
 
-dataset_ratio = 0.01
+dataset_ratio = 1
 
 device_name = "mps"
 device = torch.device(device_name)
-
-#                                                       DATASET
-data_aug = transforms.Compose([
-  transforms.RandomHorizontalFlip(p=0.5),
-  transforms.RandomRotation(20),
-  transforms.ColorJitter(brightness=0.2),
-  transforms.RandomResizedCrop(size=(224,224), scale=(0.4,1.0)),
-  transforms.ToTensor(),
-  transforms.Normalize((0.5458, 0.4443, 0.3442), (0.2711, 0.2740, 0.2792)),
-])
-
-test_transform = transforms.Compose([
-  transforms.Resize((224,224)),
-  transforms.ToTensor(),
-  transforms.Normalize((0.5458, 0.4443, 0.3442), (0.2711, 0.2740, 0.2792)),
-])
-
-print(f"Apply data augmentation: {data_aug}")
-
-# FOOD 101K
-trainset = torchvision.datasets.Food101(root='./data', split="train", download=True, transform=data_aug)
-
-bigTrainSet = torch.utils.data.ConcatDataset([trainset, trainset])
-# print(len(bigTrainSet))
-trainloader = torch.utils.data.DataLoader(bigTrainSet, batch_size=1, shuffle=True)
-
-testset = torchvision.datasets.Food101(root='./data', split="test", download=True, transform=test_transform)
-testloader = torch.utils.data.DataLoader(testset, batch_size=1, shuffle=False)
 
 def extract_frozen_features(out_file, dataloader):
   # pretrained_models = alexfc6_vgg16fc6()
@@ -76,7 +48,7 @@ def extract_frozen_features(out_file, dataloader):
 
       # print(label_w_ft.shape)
       # ft_set = torch.cat((ft_set, label_w_ft.unsqueeze(0)), dim = 0).to(device)
-      ft_set = torch.cat((ft_set, label_w_ft.unsqueeze(0).cpu()), dim = 0)
+      ft_set = torch.cat((ft_set, label_w_ft.unsqueeze(0)), dim = 0)
 
       if index % 1000 == 0:
         print(f"{index}th image")
@@ -124,7 +96,35 @@ def data_set_from_csv(csv_file, batch_size):
 
 
 if __name__ == "__main__":
+  
   start_time = time.time()
+  #                                                       DATASET
+  data_aug = transforms.Compose([
+    transforms.RandomHorizontalFlip(p=0.5),
+    transforms.RandomRotation(20),
+    transforms.ColorJitter(brightness=0.2),
+    transforms.RandomResizedCrop(size=(224,224), scale=(0.4,1.0)),
+    transforms.ToTensor(),
+    transforms.Normalize((0.5458, 0.4443, 0.3442), (0.2711, 0.2740, 0.2792)),
+  ])
+
+  test_transform = transforms.Compose([
+    transforms.Resize((224,224)),
+    transforms.ToTensor(),
+    transforms.Normalize((0.5458, 0.4443, 0.3442), (0.2711, 0.2740, 0.2792)),
+  ])
+
+  print(f"Apply data augmentation: {data_aug}")
+
+  # FOOD 101K
+  trainset = torchvision.datasets.Food101(root='./data', split="train", download=True, transform=data_aug)
+
+  bigTrainSet = torch.utils.data.ConcatDataset([trainset, trainset])
+  # print(len(bigTrainSet))
+  trainloader = torch.utils.data.DataLoader(bigTrainSet, batch_size=1, shuffle=True)
+
+  testset = torchvision.datasets.Food101(root='./data', split="test", download=True, transform=test_transform)
+  testloader = torch.utils.data.DataLoader(testset, batch_size=1, shuffle=False)
 
   # extract_frozen_features("test.csv", trainloader5k)
 
