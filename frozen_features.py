@@ -22,7 +22,7 @@ def extract_frozen_features(out_file, dataloader):
   alex = alexnetfc6
   vgg = vgg16fc6
   with torch.no_grad():
-    ft_set = torch.empty(0)
+    ft_set = torch.empty(0).to(device)
     for index, data in enumerate(dataloader):
       img, label = data
       img = img.to(device)
