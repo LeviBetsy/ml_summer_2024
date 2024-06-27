@@ -17,10 +17,14 @@ dataset_ratio = 1
 device_name = "mps"
 device = torch.device(device_name)
 
+res = torch.hub.load('pytorch/vision:v0.10.0', 'resnet50', pretrained=True).to(device)
+res.eval()
+
+
 def extract_frozen_features(out_file, dataloader):
   # pretrained_models = alexfc6_vgg16fc6()
-  alex = alexnetfc6
-  vgg = vgg16fc6
+  # alex = alexnetfc6
+  # vgg = vgg16fc6
   with torch.no_grad():
     ft_set = torch.empty(0).to(device)
     for index, data in enumerate(dataloader):
@@ -30,14 +34,17 @@ def extract_frozen_features(out_file, dataloader):
 
       label_w_ft = label
 
-      vgg_ft = vgg(img)
-      label_w_ft = torch.cat((label_w_ft, vgg_ft.squeeze(0)), dim = 0).to(device)
+      # vgg_ft = vgg(img)
+      # label_w_ft = torch.cat((label_w_ft, vgg_ft.squeeze(0)), dim = 0).to(device)
 
 
-      aleximg = transforms.functional.resize(img, size=(227,227))
+      # aleximg = transforms.functional.resize(img, size=(227,227))
 
-      alex_ft = alex(aleximg)
-      label_w_ft = torch.cat((label_w_ft, alex_ft.squeeze(0)), dim = 0).to(device)
+      # alex_ft = alex(aleximg)
+      # label_w_ft = torch.cat((label_w_ft, alex_ft.squeeze(0)), dim = 0).to(device)
+
+      res_ft = res(img)
+      label_w_ft = torch.cat((label_w_ft, res_ft.squeeze(0)), dim = 0).to(device)
 
       # for pretrained_model in pretrained_models:
         
@@ -58,6 +65,8 @@ def extract_frozen_features(out_file, dataloader):
     df.to_csv("frozen_features/" + out_file, index=False)
 
 def data_set_from_csv(csv_file, batch_size):
+  start_time = time.time()
+
   #NOTE: data[0] is the first data line, does not include header
   data = pandas.read_csv('frozen_features/' + csv_file)
   #data shape is (num_images, 1 label + num of features)
@@ -90,8 +99,10 @@ def data_set_from_csv(csv_file, batch_size):
     labels_tensor = torch.tensor(labels_tensor, dtype=torch.long)
     features_tensor = features_tensor.to(torch.float32)
     training_dataset.append((labels_tensor, features_tensor))
-
-    
+  
+  end_time = time.time()
+  elapsed_time = end_time - start_time
+  print(f"Elapsed time for csv {csv_file} dataset reading: {int(elapsed_time)} seconds")
   return training_dataset, ft_concat_size
 
 
@@ -99,36 +110,45 @@ if __name__ == "__main__":
   
   start_time = time.time()
   #                                                       DATASET
-  data_aug = transforms.Compose([
-    transforms.RandomHorizontalFlip(p=0.5),
-    transforms.RandomRotation(20),
-    transforms.ColorJitter(brightness=0.2),
-    transforms.RandomResizedCrop(size=(224,224), scale=(0.4,1.0)),
-    transforms.ToTensor(),
-    transforms.Normalize((0.5458, 0.4443, 0.3442), (0.2711, 0.2740, 0.2792)),
-  ])
+  # data_aug = transforms.Compose([
+  #   transforms.RandomHorizontalFlip(p=0.5),
+  #   transforms.RandomRotation(20),
+  #   transforms.ColorJitter(brightness=0.2),
+  #   transforms.RandomResizedCrop(size=(224,224), scale=(0.4,1.0)),
+  #   transforms.ToTensor(),
+  #   transforms.Normalize((0.5458, 0.4443, 0.3442), (0.2711, 0.2740, 0.2792)),
+  # ])
 
-  test_transform = transforms.Compose([
-    transforms.Resize((224,224)),
-    transforms.ToTensor(),
-    transforms.Normalize((0.5458, 0.4443, 0.3442), (0.2711, 0.2740, 0.2792)),
-  ])
+  # test_transform = transforms.Compose([
+  #   transforms.Resize((224,224)),
+  #   transforms.ToTensor(),
+  #   transforms.Normalize((0.5458, 0.4443, 0.3442), (0.2711, 0.2740, 0.2792)),
+  # ])
 
-  print(f"Apply data augmentation: {data_aug}")
+  # print(f"Apply data augmentation: {data_aug}")
+
+  preprocess = transforms.Compose([
+    transforms.Resize(256),
+    transforms.CenterCrop(224),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+  ])
 
   # FOOD 101K
-  trainset = torchvision.datasets.Food101(root='./data', split="train", download=True, transform=data_aug)
+  # trainset = torchvision.datasets.Food101(root='./data', split="train", download=True, transform= AlexNet_Weights.IMAGENET1K_V1.transforms())
+  trainset = torchvision.datasets.Food101(root='./data', split="train", download=True, transform= preprocess)
 
-  bigTrainSet = torch.utils.data.ConcatDataset([trainset, trainset])
+  # bigTrainSet = torch.utils.data.ConcatDataset([trainset, trainset])
   # print(len(bigTrainSet))
-  trainloader = torch.utils.data.DataLoader(bigTrainSet, batch_size=1, shuffle=True)
+  trainloader = torch.utils.data.DataLoader(trainset, batch_size=1, shuffle=True)
 
-  testset = torchvision.datasets.Food101(root='./data', split="test", download=True, transform=test_transform)
+  # testset = torchvision.datasets.Food101(root='./data', split="test", download=True, transform= AlexNet_Weights.IMAGENET1K_V1.transforms())
+  testset = torchvision.datasets.Food101(root='./data', split="test", download=True, transform= preprocess)
   testloader = torch.utils.data.DataLoader(testset, batch_size=1, shuffle=False)
 
   # extract_frozen_features("test.csv", trainloader5k)
 
-  extract_frozen_features("doublef101_test.csv", testloader)
+  extract_frozen_features("res50train.csv", trainloader)
   # extract_frozen_features("food101k_10000images.csv", trainloader)
   print("finished")
   end_time = time.time()

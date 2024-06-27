@@ -1,11 +1,7 @@
-import pandas as pd
 import torch
-import numpy as np
-from torchvision.models import AlexNet_Weights
 import os
 import torch.nn as nn
 import time
-from torchvision.io import read_image
 import torch.optim as optim
 import torchvision
 from torcheval.metrics import MulticlassAccuracy
@@ -29,7 +25,8 @@ class Food5kClassifier(nn.Module):
       nn.ReLU(),
       nn.Linear(256, 2),
       nn.Softmax(dim = 1) #apply soft max to the second dimension, ignoring batch
-  )
+    )
+    print(f"Classifier layers: {self.layers}")
 
   def forward(self, x):
     x = self.layers(x)
@@ -40,15 +37,15 @@ class Food101kClassifier(nn.Module):
     super().__init__()
     self.layers = nn.Sequential(
       nn.ReLU(),
-      nn.Linear(ft_concat_size, 4000),
-      nn.BatchNorm1d(4000),
-      nn.ReLU(),
-
-      nn.Linear(4000, 1000),
+      nn.Linear(ft_concat_size, 1000),
       nn.BatchNorm1d(1000),
       nn.ReLU(),
 
-      nn.Linear(1000, 101),
+      nn.Linear(1000, 500),
+      nn.BatchNorm1d(500),
+      nn.ReLU(),
+
+      nn.Linear(500, 101),
       nn.Softmax(dim = 1) #apply soft max to the second dimension, ignoring batch
     )
     print(f"Classifier layers: {self.layers}")
@@ -57,11 +54,12 @@ class Food101kClassifier(nn.Module):
     x = self.layers(x)
     return x
 
-def train_model(model, trainset, epoch_num, criterion, optimizer):
+def train_model(model, trainset, epoch_num, criterion, optimizer, testset, verbose):
   start_time = time.time()
   for epoch in range(epoch_num):
     model.train()
-    print(str(epoch + 1) + "th epoch")
+    if verbose:
+      print(str(epoch + 1) + "th epoch")
     for batch in trainset:
       labels, inputs = batch
       inputs = inputs.to(device)
@@ -73,13 +71,15 @@ def train_model(model, trainset, epoch_num, criterion, optimizer):
       loss.backward()
 
       optimizer.step()
-    print(f"Accuracy at {epoch + 1}th epoch: {assess_accuracy(model, testset)}")
+    if verbose:
+      print(f"Accuracy at {epoch + 1}th epoch: {assess_accuracy(model, testset)}")
 
   end_time = time.time()
   elapsed_time = end_time - start_time
+  # if verbose:
   print(f"Elapsed time: {int(elapsed_time)} seconds")
 
-def assess_accuracy(model, testloader):
+def assess_accuracy(model, testset):
   model.eval()
   predictions = torch.empty(0).to(device)
   actual_labels = torch.empty(0).to(device)
@@ -104,9 +104,9 @@ if __name__ == "__main__":
   batch_size = 32
   print(f"Batch size: {batch_size}")
 
-  trainset, ft_concat_size = frozen_features.data_set_from_csv("doublef101_aug.csv", batch_size)
+  trainset, ft_concat_size = frozen_features.data_set_from_csv("food101ktrain.csv", batch_size)
 
-  testset, _ = frozen_features.data_set_from_csv("doublef101_test.csv", batch_size)
+  testset, _ = frozen_features.data_set_from_csv("food101ktest.csv", batch_size)
 
   end_time = time.time()
   elapsed_time = end_time - start_time
