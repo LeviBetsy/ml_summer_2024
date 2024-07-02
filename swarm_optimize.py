@@ -10,17 +10,83 @@ import random
 from sklearn.decomposition import PCA
 import numpy as np
 
+from collections import OrderedDict
+
 from food_classifier import train_model, assess_accuracy
 
 device_name = "mps"
 device = torch.device(device_name)
 
+#                                           CLASSIFIERS
+class Food11AdjustableClassifier(nn.Module):
+  def __init__(self, hp, ft_concat_size, first=False): #hp stands for hyperparameters
+    super().__init__()
+    nodes = [ft_concat_size, *hp] #prepending ft_concat_size to hp
+    layers = []
+    for i in range(len(nodes) - 1):
+      layers.append((f"linear{i}", nn.Linear(nodes[i], nodes[i + 1])))
+      layers.append((f"b{i}", nn.BatchNorm1d(nodes[i + 1])))
+      layers.append((f"relu{i}", nn.ReLU()))
+
+    layers.append(("last_linear", nn.Linear(nodes[-1], 11)))
+    layers.append(("softmax", nn.Softmax(dim = 1)))
+
+    self.layers = nn.Sequential(OrderedDict(layers))
+
+    if first:
+      print(f"Classifier layers: {self.layers}")
+
+  def forward(self, x):
+    x = self.layers(x)
+    return x
+
+class Food11AdjustablePCAClassifier(nn.Module):
+  def __init__(self, hp, trainset, pca_numcomponent): #hp stands for hyperparameters
+    super().__init__()
+
+    #       PCA SET UP
+    unbatched_features = [f.numpy() for (labels, features) in trainset for f in features]
+
+    print(f"Number of samples for PCA {len(unbatched_features)}")
+
+    X = np.array(unbatched_features)
+    pca = PCA(n_components=pca_numcomponent, random_state=42)
+    pca.fit(X)
+    number_of_components = pca.n_components_
+
+    print("Number of features (PCs) used:", pca.n_components_)
+
+    # Optional: Print explained variance ratio per PC
+    print("Explained variance ratio per component:")
+    print(pca.explained_variance_ratio_)
+
+    #MODEL 
+
+    d1 = hp[0]
+    self.layers = nn.Sequential(
+      nn.ReLU(),
+      nn.Linear(ft_concat_size, d1),
+      nn.BatchNorm1d(d1),
+      nn.ReLU(),
+
+      # nn.Linear(d1, d2),
+      # nn.BatchNorm1d(d2),
+      # nn.ReLU(),
+
+      nn.Linear(d1, 11), #TODO: DONT FORGET TO CHANGE TO 101
+      nn.Softmax(dim = 1) #apply soft max to the second dimension, ignoring batch
+    )
+    # print(f"Classifier layers: {self.layers}")
+
+  def forward(self, x):
+    x = self.layers(x)
+    return x
+
 class Food101AdjustableClassifier(nn.Module):
   def __init__(self, hp): #hp stands for hyperparameters
     super().__init__()
-    d1, d2 = hp
+    d1, d2, d3 = hp
     self.layers = nn.Sequential(
-      nn.ReLU(),
       nn.Linear(ft_concat_size, d1),
       nn.BatchNorm1d(d1),
       nn.ReLU(),
@@ -29,7 +95,11 @@ class Food101AdjustableClassifier(nn.Module):
       nn.BatchNorm1d(d2),
       nn.ReLU(),
 
-      nn.Linear(d2, 101), #TODO: DONT FORGET TO CHANGE TO 101
+      nn.Linear(d2, d3),
+      nn.BatchNorm1d(d3),
+      nn.ReLU(),
+
+      nn.Linear(d3, 101), #TODO: DONT FORGET TO CHANGE TO 101
       nn.Softmax(dim = 1) #apply soft max to the second dimension, ignoring batch
     )
     # print(f"Classifier layers: {self.layers}")
@@ -65,8 +135,13 @@ class Food101AdjustablePCAClassifier(nn.Module):
     x = self.layers(x)
     return x
 
+#                                           SWARMS
+
 class SwarmOptimize():
-  def __init__(self, bounds, trainset, epoch_num, criterion, testset):
+  def __init__(self, model_type, bounds, trainset, epoch_num, criterion, testset):
+    self.model_type = model_type
+
+
     self.trainset = trainset
     self.epoch_num = epoch_num
     self.criterion = criterion
@@ -77,7 +152,7 @@ class SwarmOptimize():
 
     self.best_hp = [round(random.uniform(tup[0], tup[1])) for tup in self.bounds]
     print(f"Initial hyperparameters: {self.best_hp}")
-    self.best_model = Food101AdjustablePCAClassifier(self.best_hp).to(device)
+    self.best_model = self.model_type(self.best_hp, ft_concat_size, True).to(device)
 
     optimizer = optim.Adam(self.best_model.parameters(), lr=0.001)
     train_model(self.best_model, trainset, epoch_num, criterion, optimizer, testset, verbose=False)
@@ -100,7 +175,7 @@ class SwarmOptimize():
     hp = [hp[i] if hp[i] >= self.bounds[i][0] else self.bounds[i][0] for i in range(self.hyperparam_num)]
     hp = [hp[i] if hp[i] <= self.bounds[i][1] else self.bounds[i][1] for i in range(self.hyperparam_num)]
 
-    model = Food101AdjustablePCAClassifier(hp).to(device)
+    model = self.model_type(hp, ft_concat_size).to(device)
     optimizer = optim.Adam(model.parameters(), lr=0.001)
     train_model(model, self.trainset, self.epoch_num, self.criterion, optimizer, self.testset, verbose=False)
 
@@ -141,40 +216,13 @@ if __name__ == "__main__":
   batch_size = 32
   print(f"Batch size: {batch_size}")
 
-  trainset, ft_concat_size = frozen_features.data_set_from_csv("food101ktrain.csv", batch_size)
-  testset, _ = frozen_features.data_set_from_csv("food101ktest.csv", batch_size)
-
-  #PCA
-
-  start_time = time.time()
-  #unbatch, so they're all one list of feature tensors and turn each tensor into numpy array
-  unbatched_features = [f.numpy() for (labels, features) in trainset for f in features]
-
-  print(f"Number of samples for PCA {len(unbatched_features)}")
-
-  #converting trainset into numpy array of shape (num_of_images, num_of_features)
-  X = np.array(unbatched_features)
-
-  pca = PCA(n_components=2000, random_state=42)
-  pca.fit(X)
-  number_of_components = pca.n_components_
-
-  print("Number of features (PCs) used:", pca.n_components_)
-
-  # Optional: Print explained variance ratio per PC
-  print("Explained variance ratio per component:")
-  print(pca.explained_variance_ratio_)
-
-  end_time = time.time()
-  elapsed_time = end_time - start_time
-  print(f"Elapsed time for PCA construction: {int(elapsed_time)} seconds")
+  trainset, ft_concat_size = frozen_features.data_set_from_csv("f11vgg16conv_train.csv", batch_size)
+  testset, _ = frozen_features.data_set_from_csv("f11vgg16conv_test.csv", batch_size)
 
   # MODELS
+  search_range = [(250, 8000), (250, 1000)]
 
-  # concat_size (8000 something) -> d1 -> d2 -> 101
-  search_range = [(250, 3000), (250, 3000)]
-
-  swarm = SwarmOptimize(search_range, trainset, epoch_num = 4, criterion = nn.CrossEntropyLoss(), testset = testset)
+  swarm = SwarmOptimize(Food11AdjustableClassifier, search_range, trainset, epoch_num = 5, criterion = nn.CrossEntropyLoss(), testset = testset)
 
   swarm.swarm_optimization(1.3, 0.7, 5, 5)
   # print(swarm_optimization.generate_model())
